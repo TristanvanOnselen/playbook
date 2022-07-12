@@ -14,8 +14,7 @@ $rgAzADGroup = Get-AzADGroup -DisplayName "$AzAdGroupName" -ErrorAction Silently
 
 if ($rgAzADGroup) {
     Write-Host "RG Azure Active Directory group; already exists"
-}
-else {
+} else {
     # Create new RG
     Write-Host "RG does not exist, attempting to create one"
     try {
@@ -31,8 +30,7 @@ $rg = Get-AzResourceGroup -Name "$resourceGroupName" -ErrorAction SilentlyContin
 
 if ($rg) {
     Write-Host "RG already exists"
-}
-else {
+} else {
     # Create new RG
     Write-Host "RG does not exist, attempting to create one"
     try {
@@ -48,8 +46,7 @@ $keyvaultResult = Get-AzKeyVault -ResourceGroupName $rg.ResourceGroupName -Vault
 
 if ($keyvaultResult) {
     Write-Host "Keyvault already exists"
-}
-else {
+} else {
     Write-Host "Keyvault does not exist, attempting to create one"
     try {
         New-AzKeyVault -Name $vaultName -ResourceGroupName $rg.ResourceGroupName -Location westeurope -EnabledForDeployment -EnabledForTemplateDeployment -ErrorAction Stop
@@ -66,8 +63,7 @@ $SPN = get-AzADServicePrincipal -DisplayName $Appregname -ErrorAction SilentlyCo
 
 if ($SPN) {
     Write-Host "The service principle |  $AppregName already exists"
-}
-else {
+} else {
     try {
         #Create new SPN 
         New-AzADServicePrincipal -DisplayName "$AppRegName"
@@ -77,7 +73,7 @@ else {
         
         #Add to keyvault
         set-AzKeyVaultSecret -VaultName $vaultName -Name "SPN-API-LogAnalytics-sec" -SecretValue $SecretID
-        $AppClientID = ConvertTo-SecureString -String $SPNID.id -AsPlainText -Force
+        $AppClientID = ConvertTo-SecureString -String $SPNID.AppId -AsPlainText -Force
         set-AzKeyVaultSecret -VaultName $vaultName -Name SPN-API-LogAnalytics-ID -SecretValue $AppClientID
         $TenantID = ConvertTo-SecureString -String (get-AzContext).Tenant.id -AsPlainText -Force
         set-AzKeyVaultSecret -VaultName $vaultName -Name "SPN-API-LogAnalytics-TenentID" -SecretValue $TenantID

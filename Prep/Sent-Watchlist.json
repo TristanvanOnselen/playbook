@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "WorkspaceName": {
+            "type": "string",
+            "metadata": {
+                "description": "Workspace name for Log Analytics where Sentinel is configured"
+            }
+        }
+    },
+    "variables": {
+        "WatchlistName": "ServiceAccountsIps"
+    },
+    "resources": [
+        {
+            "name": "[concat(parameters('WorkspaceName'), '/Microsoft.SecurityInsights/',variables('WatchlistName'))]",
+            "type": "Microsoft.OperationalInsights/workspaces/providers/Watchlists",
+            "kind": "",
+            "properties": {
+                "displayName": "[variables('WatchlistName')]",
+                "source": "NextFence-Automation.csv",
+                "description": "This Sentinel watchlist contains the trusted IP ranges of the organization",
+                "provider": "Custom",
+                "isDeleted": false,
+                "labels": [],
+                "defaultDuration": "P1000Y",
+                "contentType": "Text/Csv",
+                "numberOfLinesToSkip": 0,
+                "itemsSearchKey": "TicketNumber",
+                "rawContent": "Description,IPRange,Tags,TicketNumber,UPN\r\nGoogle DNS adress,1.1.1.1/32,Testing,REF1234,test@nextfence.nl\r\n"
+            },
+            "apiVersion": "2021-03-01-preview"
+        }
+    ]
+}
