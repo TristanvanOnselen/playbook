@@ -27,8 +27,8 @@
                 "defaultDuration": "P1000Y",
                 "contentType": "Text/Csv",
                 "numberOfLinesToSkip": 0,
-                "itemsSearchKey": "TicketNumber",
-                "rawContent": "Description,IPRange,Tags,TicketNumber,UPN\r\nGoogle DNS adress,1.1.1.1/32,Testing,REF1234,test@nextfence.nl\r\n"
+                "itemsSearchKey": "INSERTSEARCHKEYHERE",
+                "rawContent": "INSERTSEARCHKEYHERE,SampleColumn1,SampleColumn2\r\nSamplevalue1,samplevalue2,samplevalue3\r\nsamplevalue4,samplevalue5,samplevalue6\r\n"
             },
             "apiVersion": "2021-03-01-preview"
         }
