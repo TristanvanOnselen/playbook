@@ -5,7 +5,7 @@ $RG_Kvname = $CustSn + "-sentinel-weu-prd"
 $AzAdGroupName = $CustSn + "-sentinel-deployment"
 $resourceGroupName = (Get-AzResourceGroup -Name "*playbook*").ResourceGroupName
 $location = "westeurope"
-$vaultName = "$RG_Kvname"
+$vaultName = $RG_Kvname
 $Appregname = "WC7-Sentinel-AI-LAW"
 
 Write-Host "Prep environement for KeyVault Operations; Sentinel Playbook(s)"
