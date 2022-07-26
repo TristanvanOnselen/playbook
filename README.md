@@ -23,7 +23,8 @@ $vaultName = $RG_Kvname
 $Appregname = $CustSn + "-sentinel-ai-law"
 ``` 
 
-### Permissions - LogicApp API connections
+### Permissions and roles
+
 Using a deployment template simplifies the configuration process; for example, forgetting to set the permissions correctly is no longer an issue. However, LogicApps use various systems, so permissions must be configured in Azure and M365. The following overview shows which rights (and groups) are used.
 
 | Component                 | M365/Azure    |  Permissions during (one-time) deployment     | Template deployment                       |
@@ -32,6 +33,8 @@ Using a deployment template simplifies the configuration process; for example, f
 | Service principle (SPN)   | M365          | Cloud application administrator               | Not applicable                            |
 | Microsoft Sentinel        | Azure         | Not applicable                                | Microsoft Sentinel Automation Contributor |
 | Azure subscription        | Azure         | User Access Administrator                     | User Access Administrator                 |
+| Azure Active Directory    | M365          | Group Administrator                           | not applicable                            |
+| Azure Subscription        | Azure         | Contributor                                   | Not applicable                            |
 
 
 * DD.1 - A keyvault is used to securely store the sensitive tenant information. It also unlocks the capability to reuse the LogicApp templates in multiple tenant environments like test and production. 
@@ -39,6 +42,7 @@ Using a deployment template simplifies the configuration process; for example, f
     - R.1 - We recommend using a group that has rights to all components, this group can be used in conjunction with PIM groups to acomplisch least priviled access model. The PIM-able Azure Active Directory groups must enabed during creation of the goup. 
 * DD.3 - The naming convention of this group is [tenantShortName]-Sentinel-deployment.
 
+#### How to deploy Azure Active Directory Groups (see permissions -> component -> Azure Active Directory)
 ```PowerShell 
 $AzAdGroupName = $CustSn + "-sentinel-deployment" ## change this to your preffered naming convention
 $rgAzADGroup = Get-AzADGroup -DisplayName "$AzAdGroupName" -ErrorAction SilentlyContinue
@@ -49,6 +53,40 @@ if ($rgAzADGroup) {
     Write-Host "RG does not exist, attempting to create one"
     try {
         $rgAzADGroup = new-AzADGroup -DisplayName "$AzAdGroupName" -MailNickName "$AzAdGroupName" -Description "Assign permissions to members to deploy Playbooks" -ErrorAction Stop
+    }
+    catch {
+        Write-Error $_.Exception.Message
+        break
+    }
+}
+```
+#### How to deploy Resource group (see permissiosn -> component -> Azure Subscription)
+``` PowerShell
+$rg = Get-AzResourceGroup -Name "$resourceGroupName" -ErrorAction SilentlyContinue
+
+if ($rg) {
+    Write-Host "RG already exists"
+} else {
+    # Create new RG
+    Write-Host "RG does not exist, attempting to create one"
+    try {
+        $rg = New-AzResourceGroup -Name $ResourceGroupName -Location $location -ErrorAction Stop
+    }
+    catch {
+        Write-Error $_.Exception.Message
+        break
+    }
+}
+```
+#### How to deploy Azure KeyVault (see permissions -> component -> Azure KeyVault) 
+``` PowerShell
+$keyvaultResult = Get-AzKeyVault -ResourceGroupName $rg.ResourceGroupName -VaultName $vaultName -ErrorAction SilentlyContinue
+if ($keyvaultResult) {
+    Write-Host "Keyvault already exists"
+} else {
+    Write-Host "Keyvault does not exist, attempting to create one"
+    try {
+        New-AzKeyVault -Name $vaultName -ResourceGroupName $rg.ResourceGroupName -Location westeurope -EnabledForDeployment -EnabledForTemplateDeployment -ErrorAction Stop
     }
     catch {
         Write-Error $_.Exception.Message
