@@ -1,0 +1,30 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "ClientID": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/0cb3ce30-3740-43a7-8856-2803c16d80ae/resourceGroups/nf-sentinel-playbooks-weu-prd/providers/Microsoft.KeyVault/vaults/wc7-sentinel-weu-prd"
+                },
+                "SecretName": "SPN-API-LogAnalytics-ID"
+            }
+        },
+        "ClientSecret": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/0cb3ce30-3740-43a7-8856-2803c16d80ae/resourceGroups/nf-sentinel-playbooks-weu-prd/providers/Microsoft.KeyVault/vaults/wc7-sentinel-weu-prd"
+                },
+                "SecretName": "SPN-API-LogAnalytics-sec"
+            }
+        },
+        "TenantID": {
+            "reference": {
+                "keyVault": {
+                    "id": "/subscriptions/0cb3ce30-3740-43a7-8856-2803c16d80ae/resourceGroups/nf-sentinel-playbooks-weu-prd/providers/Microsoft.KeyVault/vaults/wc7-sentinel-weu-prd"
+                },
+                "SecretName": "SPN-API-LogAnalytics-TenentID"
+            }
+        }
+    }
+}

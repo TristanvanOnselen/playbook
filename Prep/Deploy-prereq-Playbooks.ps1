@@ -65,7 +65,7 @@ if ($SPN) {
     Write-Host "The service principle |  $AppregName already exists"
 } else {
     try {
-        #Create new SPN 
+        #Create new SPN
         New-AzADServicePrincipal -DisplayName "$AppRegName"
         $SPNID = Get-AzADServicePrincipal -DisplayName "$AppRegName"
         $Key = New-AzADSpCredential -ObjectId ($SPNID).id

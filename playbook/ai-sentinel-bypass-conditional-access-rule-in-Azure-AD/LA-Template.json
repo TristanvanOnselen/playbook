@@ -1,0 +1,362 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "ClientSecret": {
+            "type": "string",
+            "defaultValue": "SPN-API-LogAnalytics-sec",
+            "metadata": {
+                "description": "The name of the secret."
+            }
+        },
+        "ClientID": {
+            "type": "string",
+            "defaultValue": "SPN-API-LogAnalytics-ID",
+            "metadata": {
+                "description": "The name of the secret."
+            }
+        },
+        "TenantID": {
+            "type": "string",
+            "defaultValue": "SPN-API-LogAnalytics-TenentID",
+            "metadata": {
+                "description": "TenantID."
+            }
+        },
+        "playbookName": {
+            "type": "string",
+            "defaultValue": "ai-sentinel-bypass-conditional-access-rule-in-Azure-AD1"
+        },
+        "RGSentinelWorkspace": {
+            "type": "string",
+            "defaultValue": "nf-sentinel-weu-prd"
+        },
+        "RNSentinelWorkspace": {
+            "type": "string",
+            "defaultValue": "nf-Tristan-sent-weu-prd"
+        },
+        "roleDefinitionID": {
+            "defaultValue": "73c42c96-874c-492b-b04d-ab87d138a893", //id
+            "type": "string",
+            "metadata": {
+                "description": "Azure AD Log analytics reader"
+            }
+        }
+    },
+    "variables": {
+        "AzuremonitorlogsConnectionName": "[concat('Azuremonitorlogs-', parameters('PlaybookName'))]",
+        "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
+        "currentRg": "[resourceGroup().name]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('AzuremonitorlogsConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "[variables('AzuremonitorlogsConnectionName')]",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuremonitorlogs')]"
+                },
+                "ParameterValues": {
+                    "token:TenantId": "[parameters('TenantID')]",
+                    "token:clientId": "[parameters('ClientID')]",
+                    "token:grantType": "client_credentials",
+                    "token:clientSecret": "[parameters('ClientSecret')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[variables('MicrosoftSentinelConnectionName')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "[variables('MicrosoftSentinelConnectionName')]",
+                "customParameterValues": {},
+                "parameterValueType": "Alternative",
+                "api": {
+                    "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]"
+                }
+            }
+        },
+        {
+            "properties": {
+                "provisioningState": "Succeeded",
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Microsoft_Sentinel_incident": {
+                            "type": "ApiConnectionWebhook",
+                            "inputs": {
+                                "body": {
+                                    "callback_url": "@{listCallbackUrl()}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                    }
+                                },
+                                "path": "/incident-creation"
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Delay": {
+                            "runAfter": {},
+                            "type": "Wait",
+                            "inputs": {
+                                "interval": {
+                                    "count": 5,
+                                    "unit": "Minute"
+                                }
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@triggerBody()?['object']?['properties']?['Alerts']",
+                            "actions": {
+                                "Alert_-_Get_incident": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                            }
+                                        },
+                                        "method": "get",
+                                        "path": "/Incidents/subscriptions/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['SubscriptionId'])}/resourceGroups/@{encodeURIComponent(triggerBody()?['workspaceInfo']?['ResourceGroupName'])}/workspaces/@{encodeURIComponent(triggerBody()?['workspaceId'])}/alerts/@{encodeURIComponent(items('For_each')?['properties']?['systemAlertId'])}"
+                                    }
+                                },
+                                "For_each_2": {
+                                    "foreach": "@body('Parse_JSON')",
+                                    "actions": {
+                                        "Condition": {
+                                            "actions": {
+                                                "Update_incident": {
+                                                    "runAfter": {},
+                                                    "type": "ApiConnection",
+                                                    "inputs": {
+                                                        "body": {
+                                                            "classification": {
+                                                                "ClassificationAndReason": "BenignPositive - SuspiciousButExpected",
+                                                                "ClassificationReasonText": "The combination of UPN and IPAddress is expected for this analytic rule and not required to to investigated. It was checked against the watchlist ; @{items('For_each_2')['Watchlist']}\n\nUPN = @{items('For_each_2')['UserPrincipleName']}\nIPAddress = @{items('For_each_2')['IPAddress']}"
+                                                            },
+                                                            "incidentArmId": "@triggerBody()?['object']?['id']",
+                                                            "status": "Closed",
+                                                            "tagsToAdd": {
+                                                                "TagsToAdd": [
+                                                                    {
+                                                                        "Tag": "Closed_by_soar"
+                                                                    }
+                                                                ]
+                                                            }
+                                                        },
+                                                        "host": {
+                                                            "connection": {
+                                                                "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                                            }
+                                                        },
+                                                        "method": "put",
+                                                        "path": "/Incidents"
+                                                    }
+                                                }
+                                            },
+                                            "runAfter": {},
+                                            "else": {
+                                                "actions": {
+                                                    "Add_comment_to_incident_(V3)": {
+                                                        "runAfter": {},
+                                                        "type": "ApiConnection",
+                                                        "inputs": {
+                                                            "body": {
+                                                                "incidentArmId": "@triggerBody()?['object']?['id']",
+                                                                "message": "<p>A playbook ran to match the IPAddress and UPN combination against the watchlist @{items('For_each_2')['Watchlist']}, watchlist, no match was found<br>\n<br>\nUPN = @{items('For_each_2')['UserPrincipleName']}<br>\nIPAddress = @{items('For_each_2')['IPAddress']}</p>"
+                                                            },
+                                                            "host": {
+                                                                "connection": {
+                                                                    "name": "@parameters('$connections')['azuresentinel']['connectionId']"
+                                                                }
+                                                            },
+                                                            "method": "post",
+                                                            "path": "/Incidents/Comment"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "expression": {
+                                                "and": [
+                                                    {
+                                                        "equals": [
+                                                            "@items('For_each_2')['Match']",
+                                                            true
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "type": "If"
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "Parse_JSON": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Foreach"
+                                },
+                                "Parse_JSON": {
+                                    "runAfter": {
+                                        "Run_query_and_list_results": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@body('Run_query_and_list_results')?['value']",
+                                        "schema": {
+                                            "items": {
+                                                "properties": {
+                                                    "IPAddress": {
+                                                        "type": "string"
+                                                    },
+                                                    "Match": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "SystemAlertId": {
+                                                        "type": "string"
+                                                    },
+                                                    "UserPrincipleName": {
+                                                        "type": "string"
+                                                    },
+                                                    "Watchlist": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "Match",
+                                                    "SystemAlertId",
+                                                    "IPAddress",
+                                                    "UserPrincipleName",
+                                                    "Watchlist"
+                                                ],
+                                                "type": "object"
+                                            },
+                                            "type": "array"
+                                        }
+                                    }
+                                },
+                                "Run_query_and_list_results": {
+                                    "runAfter": {
+                                        "Alert_-_Get_incident": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": "let ServiceAccountsIps = _GetWatchlist('ServiceAccountsIps') \n| project IPRange, UPN \n| extend KEY = \"1\"; \nlet mySecurityAlerts = SecurityAlert \n| where SystemAlertId in(\"@{items('For_each')?['properties']?['systemAlertId']}\") \n| extend Entities = todynamic(Entities)\n| mv-expand with_itemindex= Type Entities\n| extend IPAddress = tostring(Entities.Address)\n| extend UserPrincipleName = tostring(Entities.DisplayName)\n| summarize make_set_if(IPAddress, strlen(IPAddress) > 1),make_set_if(UserPrincipleName, strlen(UserPrincipleName) > 1) by SystemAlertId\n| extend tostring(IPAddress=set_IPAddress[0])\n| extend tostring(UserPrincipleName=set_UserPrincipleName[0]);\nmySecurityAlerts\n| extend KEY = \"1\" \n| join kind=inner ServiceAccountsIps  on KEY\n| extend IPMatch = ipv4_is_in_range( IPRange, IPAddress) \n| extend UPNMatch = iff( UPN == UserPrincipleName,true,false)\n| extend Match = iff((IPMatch == true and UPNMatch == true), true, false)\n| summarize count() by SystemAlertId,IPAddress,UserPrincipleName, Match\n| sort by tostring(Match) desc",
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['azuremonitorlogs_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/queryData",
+                                        "queries": {
+                                            "resourcegroups": "[parameters('RGSentinelWorkspace')]",
+                                            "resourcename": "[parameters('RNSentinelWorkspace')]",
+                                            "resourcetype": "Log Analytics Workspace",
+                                            "subscriptions": "[subscription().subscriptionId]",
+                                            "timerange": "Last 30 days"
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Delay": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach"
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azuremonitorlogs_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('AzuremonitorlogsConnectionName'))]",
+                                "connectionName": "[variables('AzuremonitorlogsConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuremonitorlogs')]"
+                            },
+                            "azuresentinel": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]",
+                                "connectionName": "[variables('MicrosoftSentinelConnectionName')]",
+                                "id": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Web/locations/', resourceGroup().location, '/managedApis/Azuresentinel')]",
+                                "connectionProperties": {
+                                    "authentication": {
+                                        "type": "ManagedServiceIdentity"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "name": "[parameters('PlaybookName')]",
+            "type": "Microsoft.Logic/workflows",
+            "location": "[resourceGroup().location]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "apiVersion": "2017-07-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', variables('AzuremonitorlogsConnectionName'))]",
+                "[resourceId('Microsoft.Web/connections', variables('MicrosoftSentinelConnectionName'))]"
+            ]
+        },
+        {
+            "name": "AutorizationPlaybookIdentity",
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2021-04-01",
+            "dependsOn": [
+                "[resourceId('Microsoft.Logic/workflows', parameters('PlaybookName'))]"
+            ],
+            "ResourceGroup": "nf-sentinel-weu-prd",
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "variables": {
+                    },
+                    "resources": [
+                        {
+                            "type": "Microsoft.Authorization/roleAssignments",
+                            "apiVersion": "2020-10-01-preview",
+                            "name": "[Guid(parameters('playbookName'))]",
+                            "properties": {
+                                "roleDefinitionId": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Authorization/roleDefinitions/',  parameters('roleDefinitionID'))]",
+                                "principalId": "[reference(resourceId(variables('currentRg'),'Microsoft.Logic/workflows', parameters('PlaybookName')), '2019-05-01', 'full').identity.principalId]",
+                                "principalType": "ServicePrincipal"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ],
+    "outputs": {}
+}
