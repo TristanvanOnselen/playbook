@@ -33,14 +33,11 @@ Using a deployment template simplifies the configuration process; for example, f
 | Azure Active Directory  | M365       | Group Administrator                      | not applicable                            |
 | Azure Subscription      | Azure      | Contributor                              | Not applicable                            |
 
-
 - DD.1 - A key vault is used to store sensitive tenant information securely. It also unlocks the capability to reuse the LogicApp templates in multiple tenant environments like test and production.
 - DD.2 - The key vault feature Azure Resource Manager for template deployment is enabled to support a deployment by code.
 - DD.3 - The naming convention of this group is [tenantShortName]-Sentinel-deployment.
 
-
 > R.1 - We recommend using a group that has rights to all components, the group can be used in conjunction with PIM groups to accomplish least priviled access model. The PIM-able Azure Active Directory groups must be enabled during the creation of the group.
-
 
 #### Step 1. Deploy Azure Active Directory Groups (see permissions -> component -> Azure Active Directory)
 
@@ -148,25 +145,21 @@ Service principle - The service Principle (App registration) is used within a AP
 | Microsoft Sentinel | Managed System Identity | Azure - Microsoft Sentinel responder | MicrosoftSentinel-[playbookname]   |
 | Azure Monitor Logs | Service Principle Name  | Azure - Log Analytics Reader         | Azuremonitorlogs-[playbookname]    |
 
-
 > Note - The LogicApp components above are two examples of the current LogicApp template. Most features support a (system) managed Identity or service principle. Remember that only resources within the tenant can use this type of authentication. At the same time, the admin does not have a password or secureID to use this Identity (avoid credential theft). Therefore, it is a recommendation to use managed identities unless the LogicApp feature only supports Service Principles like the Azure Monitor Logs.
-
 
 - DD.4 - Using the LogicApp template, the API connections are automatically made and the permissions are distributed as described above.
 
-
 > R.2 - The permissions are set during the LogicApp deployment. Therefore the user must have the Azure role User Access Administrator, Azure Contributor or Onwer. We recommend using a CI/CD pipeline. The user doesn't need to have the permissions assigned to their account but can run the code via a pipeline (incl. audit logging and code validation).
-
 
 # Deploy the LogicApp template
 
-
 ## How to; deploy the playbook
 
-Deploying Loging app via an ARM template is simple. The example below describes how you can do this via PowerShell (Terminal – Windows 10/11 or Azure PowerShell). Note that you must have specific roles 
+Deploying Loging app via an ARM template is simple. The example below describes how you can do this via PowerShell (Terminal – Windows 10/11 or Azure PowerShell). Note that you must have specific roles
 assigned to the account before you make a connection. (see – permissions and roles -> permissions during template deployment)
 
 ### Step 1: Install the following modules
+
 ```PowerShell
 Install-module az -AllowClobber -Scope CurrentUser -Force
 Install-module AzSentinel -AllowClobber -Scope CurrentUser -Force
@@ -175,6 +168,7 @@ Install-module LogicAppTemplate -AllowClobber -Scope CurrentUser -Force
 ```
 
 ### Step 2: Configure the TemplateParameter file
+
 ```JSON
 {
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
@@ -210,7 +204,7 @@ Install-module LogicAppTemplate -AllowClobber -Scope CurrentUser -Force
 
 #### Step 3 - Deploy the LogicApp template and template ParameterFile
 
-``` PowerShell
+```PowerShell
 
 New-AzResourceGroupDeployment -Name Deploy-Playbook -ResourceGroupName "nf-sentinel-playbooks-weu-prd" -TemplateFile .\playbook\ai-sentinel-bypass-conditional-access-rule-in-Azure-AD\AI-Template.json -TemplateParameterFile .\playbook\ai-sentinel-bypass-conditional-access-rule-in-Azure-AD\AI-Parameters.json
 

@@ -6,16 +6,16 @@ $AzAdGroupName = $CustSn + "-sentinel-deployment"
 $resourceGroupName = (Get-AzResourceGroup -Name "*playbook*").ResourceGroupName
 $location = "westeurope"
 $vaultName = $RG_Kvname
-$Appregname = "WC7-Sentinel-AI-LAW"
+$Appregname = $CustSn + "-sentinel-ai-law"
 
 Write-Host "Prep environement for KeyVault Operations; Sentinel Playbook(s)"
 
+$AzAdGroupName = $CustSn + "-sentinel-deployment" ## change this to your preffered naming convention
 $rgAzADGroup = Get-AzADGroup -DisplayName "$AzAdGroupName" -ErrorAction SilentlyContinue
 
 if ($rgAzADGroup) {
     Write-Host "RG Azure Active Directory group; already exists"
 } else {
-    # Create new RG
     Write-Host "RG does not exist, attempting to create one"
     try {
         $rgAzADGroup = new-AzADGroup -DisplayName "$AzAdGroupName" -MailNickName "$AzAdGroupName" -Description "Assign permissions to members to deploy Playbooks" -ErrorAction Stop
@@ -91,7 +91,7 @@ if ($SPN) {
 
 Write-Host "Setting vault access policies"
 try {
-    Set-AzKeyVaultAccessPolicy -ResourceGroupName $rg.ResourceGroupName -VaultName $vaultName -ObjectId $rgAzADGroup.ID  -PermissionsToSecrets All -PermissionsToKeys All -PermissionsToCertificates All -BypassObjectIdValidation
+    Set-AzKeyVaultAccessPolicy -ResourceGroupName $rg.ResourceGroupName -VaultName $vaultName -ObjectId $rgAzADGroup.ID  -PermissionsToSecrets get -PermissionsToKeys list -PermissionsToCertificates list  -BypassObjectIdValidation
 }
 catch {
     Write-Error $_.Exception.Message

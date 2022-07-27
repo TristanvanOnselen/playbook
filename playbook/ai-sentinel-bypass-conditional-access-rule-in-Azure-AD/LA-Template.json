@@ -25,7 +25,7 @@
         },
         "playbookName": {
             "type": "string",
-            "defaultValue": "ai-sentinel-bypass-conditional-access-rule-in-Azure-AD1"
+            "defaultValue": "ai-sentinel-bypass-conditional-access-rule-in-Azure-AD-Brahim"
         },
         "RGSentinelWorkspace": {
             "type": "string",
@@ -36,17 +36,26 @@
             "defaultValue": "nf-Tristan-sent-weu-prd"
         },
         "roleDefinitionID": {
-            "defaultValue": "73c42c96-874c-492b-b04d-ab87d138a893", //id
+            "defaultValue": "73c42c96-874c-492b-b04d-ab87d138a893",
             "type": "string",
             "metadata": {
                 "description": "Azure AD Log analytics reader"
+            }
+        },
+        "existingRuleId": {
+            "defaultValue": "15c9a95b-45eb-4ac7-948c-811f060299f8",
+            "type": "String",
+            "metadata": {
+                "description": "The analytics rule GUID that is used in the triggering conditions. Feel free to remove the condition below if you don't need it."
             }
         }
     },
     "variables": {
         "AzuremonitorlogsConnectionName": "[concat('Azuremonitorlogs-', parameters('PlaybookName'))]",
         "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
-        "currentRg": "[resourceGroup().name]"
+        "currentRg": "[resourceGroup().name]",
+        "automationRuleGuid": "[uniqueString(parameters('playbookName'))]",
+
     },
     "resources": [
         {
@@ -352,11 +361,52 @@
                                 "principalId": "[reference(resourceId(variables('currentRg'),'Microsoft.Logic/workflows', parameters('PlaybookName')), '2019-05-01', 'full').identity.principalId]",
                                 "principalType": "ServicePrincipal"
                             }
+                        },
+                        {
+                            "type": "Microsoft.SecurityInsights/automationRules",
+                            "name": "[variables('automationRuleGuid')]",
+                            "scope": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('RNSentinelWorkspace'))]",
+                            "apiVersion": "2019-01-01-preview",
+                            "properties": {
+                                "displayName": "[parameters('playbookName')]",
+                                "order": 1,
+                                "triggeringLogic": {
+                                    "isEnabled": true,
+                                    "expirationTimeUtc": null,
+                                    "triggersOn": "Incidents",
+                                    "triggersWhen": "Created",
+                                    "conditions": [
+                                        {
+                                            "conditionType": "Property",
+                                            "conditionProperties": {
+                                                "propertyName": "IncidentRelatedAnalyticRuleIds",
+                                                "operator": "Contains",
+                                                "propertyValues": [
+                                                    "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', parameters('RGSentinelWorkspace'), '/providers/Microsoft.OperationalInsights/workspaces/', parameters('RNSentinelWorkspace'), '/providers/Microsoft.SecurityInsights/alertRules/', parameters('existingRuleId'))]"
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "order": 1,
+                                        "actionType": "RunPlaybook",
+                                        "actionConfiguration": {
+                                            "tenantId": "[subscription().tenantId]",
+                                            "LogicAppResourceId": "[concat('/subscriptions/', subscription().subscriptionId, '/resourceGroups/', variables('currentRg'), '/providers/Microsoft.Logic/workflows/', parameters('playbookName'))]"
+                                        }
+                                    }
+                                ]
+                            }
                         }
                     ]
+
+
                 }
             }
         }
+
     ],
     "outputs": {}
 }
