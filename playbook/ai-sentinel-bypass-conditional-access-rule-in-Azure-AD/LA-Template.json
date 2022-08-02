@@ -24,8 +24,7 @@
             }
         },
         "playbookName": {
-            "type": "string",
-            "defaultValue": "ai-sentinel-bypass-conditional-access-rule-in-Azure-AD-Brahim"
+            "type": "string"
         },
         "RGSentinelWorkspace": {
             "type": "string",
@@ -44,18 +43,26 @@
         },
         "existingRuleId": {
             "defaultValue": "15c9a95b-45eb-4ac7-948c-811f060299f8",
-            "type": "String",
+            "type": "string",
             "metadata": {
                 "description": "The analytics rule GUID that is used in the triggering conditions. Feel free to remove the condition below if you don't need it."
             }
+        },
+        "InvestigationKQL": {
+            "type": "string"
+        },
+        "ClosingClassificationReason": {
+            "type": "string"
+        },
+        "CommentToIncident": {
+            "type": "string"
         }
     },
     "variables": {
         "AzuremonitorlogsConnectionName": "[concat('Azuremonitorlogs-', parameters('PlaybookName'))]",
         "MicrosoftSentinelConnectionName": "[concat('MicrosoftSentinel-', parameters('PlaybookName'))]",
         "currentRg": "[resourceGroup().name]",
-        "automationRuleGuid": "[uniqueString(parameters('playbookName'))]",
-
+        "automationRuleGuid": "[uniqueString(parameters('playbookName'))]"
     },
     "resources": [
         {
@@ -161,7 +168,7 @@
                                                         "body": {
                                                             "classification": {
                                                                 "ClassificationAndReason": "BenignPositive - SuspiciousButExpected",
-                                                                "ClassificationReasonText": "The combination of UPN and IPAddress is expected for this analytic rule and not required to to investigated. It was checked against the watchlist ; @{items('For_each_2')['Watchlist']}\n\nUPN = @{items('For_each_2')['UserPrincipleName']}\nIPAddress = @{items('For_each_2')['IPAddress']}"
+                                                                "ClassificationReasonText": "[parameters('ClosingClassificationReason')]"
                                                             },
                                                             "incidentArmId": "@triggerBody()?['object']?['id']",
                                                             "status": "Closed",
@@ -192,7 +199,7 @@
                                                         "inputs": {
                                                             "body": {
                                                                 "incidentArmId": "@triggerBody()?['object']?['id']",
-                                                                "message": "<p>A playbook ran to match the IPAddress and UPN combination against the watchlist @{items('For_each_2')['Watchlist']}, watchlist, no match was found<br>\n<br>\nUPN = @{items('For_each_2')['UserPrincipleName']}<br>\nIPAddress = @{items('For_each_2')['IPAddress']}</p>"
+                                                                "message": "[parameters('CommentToIncident')]"
                                                             },
                                                             "host": {
                                                                 "connection": {
@@ -274,7 +281,7 @@
                                     },
                                     "type": "ApiConnection",
                                     "inputs": {
-                                        "body": "let ServiceAccountsIps = _GetWatchlist('ServiceAccountsIps') \n| project IPRange, UPN \n| extend KEY = \"1\"; \nlet mySecurityAlerts = SecurityAlert \n| where SystemAlertId in(\"@{items('For_each')?['properties']?['systemAlertId']}\") \n| extend Entities = todynamic(Entities)\n| mv-expand with_itemindex= Type Entities\n| extend IPAddress = tostring(Entities.Address)\n| extend UserPrincipleName = tostring(Entities.DisplayName)\n| summarize make_set_if(IPAddress, strlen(IPAddress) > 1),make_set_if(UserPrincipleName, strlen(UserPrincipleName) > 1) by SystemAlertId\n| extend tostring(IPAddress=set_IPAddress[0])\n| extend tostring(UserPrincipleName=set_UserPrincipleName[0]);\nmySecurityAlerts\n| extend KEY = \"1\" \n| join kind=inner ServiceAccountsIps  on KEY\n| extend IPMatch = ipv4_is_in_range( IPRange, IPAddress) \n| extend UPNMatch = iff( UPN == UserPrincipleName,true,false)\n| extend Match = iff((IPMatch == true and UPNMatch == true), true, false)\n| summarize count() by SystemAlertId,IPAddress,UserPrincipleName, Match\n| sort by tostring(Match) desc",
+                                        "body": "[parameters('InvestigationKQL')]",
                                         "host": {
                                             "connection": {
                                                 "name": "@parameters('$connections')['azuremonitorlogs_1']['connectionId']"

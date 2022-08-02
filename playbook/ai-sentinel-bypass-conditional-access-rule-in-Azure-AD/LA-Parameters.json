@@ -25,6 +25,18 @@
                 },
                 "SecretName": "SPN-API-LogAnalytics-TenentID"
             }
+        },
+        "InvestigationKQL": {
+            "value": "let ServiceAccountsIps = _GetWatchlist('ServiceAccountsIps') \n| project IPRange, UPN \n| extend KEY = \"1\"; \nlet mySecurityAlerts = SecurityAlert \n| where SystemAlertId in(\"@{items('For_each')?['properties']?['systemAlertId']}\") \n| extend Entities = todynamic(Entities)\n| mv-expand with_itemindex= Type Entities\n| extend IPAddress = tostring(Entities.Address)\n| extend UserPrincipleName = tostring(Entities.DisplayName)\n| summarize make_set_if(IPAddress, strlen(IPAddress) > 1),make_set_if(UserPrincipleName, strlen(UserPrincipleName) > 1) by SystemAlertId\n| extend tostring(IPAddress=set_IPAddress[0])\n| extend tostring(UserPrincipleName=set_UserPrincipleName[0]);\nmySecurityAlerts\n| extend KEY = \"1\" \n| join kind=inner ServiceAccountsIps  on KEY\n| extend IPMatch = ipv4_is_in_range( IPRange, IPAddress) \n| extend UPNMatch = iff( UPN == UserPrincipleName,true,false)\n| extend Match = iff((IPMatch == true and UPNMatch == true), true, false)\n| summarize count() by SystemAlertId,IPAddress,UserPrincipleName, Match\n| sort by tostring(Match) desc"
+        },
+        "playbookName": {
+            "value": "ai-sentinel-bypass-conditional-access-rule-in-Azure-AD"
+        },
+        "ClosingClassificationReason": {
+            "value": "The combination of UPN and IPAddress is expected for this analytic rule and not required to to investigated. It was checked against the watchlist ; @{items('For_each_2')['Watchlist']}\n\nUPN = @{items('For_each_2')['UserPrincipleName']}\nIPAddress = @{items('For_each_2')['IPAddress']}"
+        },
+        "CommentToIncident": {
+            "value": "<p>A playbook ran to match the IPAddress and UPN combination against the watchlist @{items('For_each_2')['Watchlist']}, watchlist, no match was found<br>\n<br>\nUPN = @{items('For_each_2')['UserPrincipleName']}<br>\nIPAddress = @{items('For_each_2')['IPAddress']}</p>"
         }
     }
 }
